@@ -1,0 +1,41 @@
+# File: render.yaml
+services:
+  # Main Stable Diffusion API service
+  - type: web
+    name: stable-diffusion-api
+    env: docker
+    region: oregon
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: MODEL_NAME
+        value: sd-v1-4
+      - key: HF_HOME
+        value: /opt/render/.cache/huggingface
+      - key: SAFETENSORS_FAST_GPU
+        value: "1"
+    disk:
+      name: model-storage
+      mountPath: /opt/render/.cache
+      sizeGB: 30
+    healthCheckPath: /health
+    autoDeploy: true
+    
+  # Background worker for image processing
+  - type: worker
+    name: image-processor
+    env: docker
+    dockerfilePath: ./Dockerfile.worker
+    plan: starter
+    envVars:
+      - key: WORKER_TYPE
+        value: image_processor
+        
+  # Cron job for cleanup - FIXED: Added 'env' property
+  - type: cron
+    name: cleanup-job
+    env: python  # REQUIRED: runtime environment
+    schedule: "0 2 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python cleanup.py --days 7
+    plan: starter
